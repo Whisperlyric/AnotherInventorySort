@@ -1,0 +1,12 @@
+{
+  "category.anotherinventorysort.main": "Another Inventory Sort",
+  "key.anotherinventorysort.sort": "排序物品栏",
+  "key.anotherinventorysort.sort_column": "按列排序",
+  "key.anotherinventorysort.sort_row": "按行排序",
+  "anotherinventorysort.button.sort": "排序",
+  "anotherinventorysort.button.sort_column": "按列排序",
+  "anotherinventorysort.button.sort_row": "按行排序",
+  "anotherinventorysort.message.sorted": "物品栏已排序",
+  "anotherinventorysort.message.sorted_column": "物品栏已按列排序",
+  "anotherinventorysort.message.sorted_row": "物品栏已按行排序"
+}
