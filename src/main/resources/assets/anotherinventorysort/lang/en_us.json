@@ -1,0 +1,12 @@
+{
+  "category.anotherinventorysort.main": "Another Inventory Sort",
+  "key.anotherinventorysort.sort": "Sort Inventory",
+  "key.anotherinventorysort.sort_column": "Sort by Column",
+  "key.anotherinventorysort.sort_row": "Sort by Row",
+  "anotherinventorysort.button.sort": "Sort",
+  "anotherinventorysort.button.sort_column": "Sort by Column",
+  "anotherinventorysort.button.sort_row": "Sort by Row",
+  "anotherinventorysort.message.sorted": "Inventory sorted",
+  "anotherinventorysort.message.sorted_column": "Inventory sorted by column",
+  "anotherinventorysort.message.sorted_row": "Inventory sorted by row"
+}
