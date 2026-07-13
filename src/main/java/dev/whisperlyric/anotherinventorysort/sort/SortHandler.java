@@ -46,7 +46,7 @@ public class SortHandler {
     private static int detectColumns(List<Integer> sortableSlots, AbstractContainerMenu menu) {
         if (sortableSlots.isEmpty()) return 9;
         // Count slots in the first row by finding slots with the same y coordinate
-        int firstY = menu.getSlot(sortableSlots.get(0)).y;
+        int firstY = menu.getSlot(sortableSlots.getFirst()).y;
         int count = 0;
         for (int index : sortableSlots) {
             if (menu.getSlot(index).y == firstY) {
@@ -83,7 +83,7 @@ public class SortHandler {
             // Sort by count descending (merge into fullest stacks first)
             positions.sort((a, b) -> items.get(b).getCount() - items.get(a).getCount());
 
-            int targetPos = positions.get(0);
+            int targetPos = positions.getFirst();
             for (int i = 1; i < positions.size(); i++) {
                 int sourcePos = positions.get(i);
                 ItemStack sourceItem = items.get(sourcePos);
