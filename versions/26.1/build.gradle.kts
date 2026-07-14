@@ -21,7 +21,13 @@ dependencies {
     "minecraft"("com.mojang:minecraft:$minecraft_version")
     implementation("net.fabricmc:fabric-loader:$fabric_loader_version")
     implementation("net.fabricmc.fabric-api:fabric-api:$fabric_api_version")
-    implementation(project(":common"))
+}
+
+sourceSets {
+    getByName("main") {
+        java.srcDir(project(":common").file("src/main/java"))
+        resources.srcDir(project(":common").file("src/main/resources"))
+    }
 }
 
 loom {
@@ -29,6 +35,8 @@ loom {
 }
 
 tasks.processResources {
+    exclude { it.file.path.contains("common") && it.name == "anotherinventorysort.accesswidener" }
+
     inputs.property("version", project.version)
     inputs.property("minecraft_version", minecraft_version)
     inputs.property("loader_version", fabric_loader_version)
