@@ -18,6 +18,7 @@ repositories {
 }
 
 dependencies {
+    implementation(project(":common"))
     minecraft("com.mojang:minecraft:$minecraft_version")
     mappings(loom.officialMojangMappings())
     modImplementation("net.fabricmc:fabric-loader:$fabric_loader_version")
