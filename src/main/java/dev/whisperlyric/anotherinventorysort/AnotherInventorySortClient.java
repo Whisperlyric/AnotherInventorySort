@@ -29,7 +29,6 @@ public class AnotherInventorySortClient implements ClientModInitializer {
     private static final int BUTTON_GAP = 2;
     private static final ResourceLocation BUTTON_TEXTURE = ResourceLocation.fromNamespaceAndPath(
             "anotherinventorysort", "textures/gui/gui_buttons.png");
-    private static final int TEXTURE_SIZE = 256;
 
     private static class SortButtonInfo {
         final int x;
@@ -259,7 +258,7 @@ public class AnotherInventorySortClient implements ClientModInitializer {
             int u = btn.textureX;
             int v = hovered ? BUTTON_SIZE : 0;
             graphics.blit(RenderPipelines.GUI_TEXTURED, BUTTON_TEXTURE, btn.x, btn.y, u, v,
-                    BUTTON_SIZE, BUTTON_SIZE, TEXTURE_SIZE, TEXTURE_SIZE);
+                    BUTTON_SIZE, BUTTON_SIZE, 128, 128);
         }
     }
 }
