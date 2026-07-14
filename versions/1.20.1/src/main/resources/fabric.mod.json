@@ -5,7 +5,11 @@
   "name": "Another Inventory Sort",
   "description": "A simple inventory sorting mod",
   "authors": ["WhisperLyric"],
-  "contact": {},
+  "contact": {
+    "homepage": "https://github.com/Whisperlyric/AnotherInventorySort",
+    "sources": "https://github.com/Whisperlyric/AnotherInventorySort",
+    "issues": "https://github.com/Whisperlyric/AnotherInventorySort/issues"
+  },
   "license": "MIT",
   "environment": "client",
   "entrypoints": {
