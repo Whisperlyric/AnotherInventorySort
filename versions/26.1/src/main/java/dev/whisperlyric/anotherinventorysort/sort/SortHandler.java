@@ -1,5 +1,6 @@
 package dev.whisperlyric.anotherinventorysort.sort;
 
+import dev.whisperlyric.anotherinventorysort.LockSlotManager;
 import dev.whisperlyric.anotherinventorysort.item.ItemWrapper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -17,13 +18,13 @@ public class SortHandler {
         return !screen.getMenu().slots.isEmpty();
     }
 
-    public static void sortInventory(AbstractContainerScreen<?> screen, SortMode mode, String category) {
+    public static void sortInventory(AbstractContainerScreen<?> screen, SortMode mode, String category, boolean ignoreLocks) {
         Minecraft client = Minecraft.getInstance();
         if (client.player == null || client.gameMode == null) return;
 
         AbstractContainerMenu menu = screen.getMenu();
         boolean isPlayerInventory = "PURE_BACKPACK".equals(category);
-        List<Integer> sortableSlots = getSortableSlots(menu, isPlayerInventory, category);
+        List<Integer> sortableSlots = getSortableSlots(menu, isPlayerInventory, category, ignoreLocks);
         if (sortableSlots.isEmpty()) return;
 
         // Phase 1: Merge same-type items
@@ -428,7 +429,7 @@ public class SortHandler {
 
     // Slot detection
 
-    private static List<Integer> getSortableSlots(AbstractContainerMenu menu, boolean isPlayerInventory, String category) {
+    private static List<Integer> getSortableSlots(AbstractContainerMenu menu, boolean isPlayerInventory, String category, boolean ignoreLocks) {
         List<Integer> slots = new ArrayList<>();
 
         // GCA fake player inventory: GENERIC_9x6, sortable slots 18-53 (items 0-35, last 4 rows)
@@ -453,7 +454,10 @@ public class SortHandler {
                 if (slot.container instanceof Inventory) {
                     int containerSlot = slot.slot;
                     if (containerSlot >= 9 && containerSlot <= 35) {
-                        slots.add(i);
+                        // Skip locked slots unless ignoreLocks is set
+                        if (ignoreLocks || !LockSlotManager.isSlotLocked(containerSlot)) {
+                            slots.add(i);
+                        }
                     }
                 }
             }

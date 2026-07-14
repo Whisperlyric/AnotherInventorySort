@@ -18,11 +18,17 @@ repositories {
 }
 
 dependencies {
-    implementation(project(":common"))
     minecraft("com.mojang:minecraft:$minecraft_version")
     mappings(loom.officialMojangMappings())
     modImplementation("net.fabricmc:fabric-loader:$fabric_loader_version")
     modImplementation("net.fabricmc.fabric-api:fabric-api:$fabric_api_version")
+}
+
+sourceSets {
+    getByName("main") {
+        java.srcDir(project(":common").file("src/main/java"))
+        resources.srcDir(project(":common").file("src/main/resources"))
+    }
 }
 
 loom {
@@ -30,10 +36,6 @@ loom {
 }
 
 tasks.processResources {
-    from(project(":common").file("src/main/resources/anotherinventorysort.accesswidener")) {
-        into("")
-    }
-
     inputs.property("version", project.version)
     inputs.property("minecraft_version", minecraft_version)
     inputs.property("loader_version", fabric_loader_version)
