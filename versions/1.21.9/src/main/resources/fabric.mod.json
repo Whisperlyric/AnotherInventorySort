@@ -9,9 +9,7 @@
   "license": "MIT",
   "environment": "client",
   "entrypoints": {
-    "client": [
-      "dev.whisperlyric.anotherinventorysort.AnotherInventorySortClient"
-    ]
+    "client": ["dev.whisperlyric.anotherinventorysort.AnotherInventorySortClient"]
   },
   "accessWidener": "anotherinventorysort.accesswidener",
   "depends": {

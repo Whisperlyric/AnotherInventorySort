@@ -1,5 +1,5 @@
 plugins {
-    id("net.fabricmc.fabric-loom-remap")
+    id("net.fabricmc.fabric-loom")
 }
 
 val minecraft_version: String by project
@@ -18,22 +18,17 @@ repositories {
 }
 
 dependencies {
+    "minecraft"("com.mojang:minecraft:$minecraft_version")
+    implementation("net.fabricmc:fabric-loader:$fabric_loader_version")
+    implementation("net.fabricmc.fabric-api:fabric-api:$fabric_api_version")
     implementation(project(":common"))
-    minecraft("com.mojang:minecraft:$minecraft_version")
-    mappings(loom.officialMojangMappings())
-    modImplementation("net.fabricmc:fabric-loader:$fabric_loader_version")
-    modImplementation("net.fabricmc.fabric-api:fabric-api:$fabric_api_version")
 }
 
 loom {
-    accessWidenerPath.set(project(":common").file("src/main/resources/anotherinventorysort.accesswidener"))
+    accessWidenerPath.set(file("src/main/resources/anotherinventorysort.accesswidener"))
 }
 
 tasks.processResources {
-    from(project(":common").file("src/main/resources/anotherinventorysort.accesswidener")) {
-        into("")
-    }
-
     inputs.property("version", project.version)
     inputs.property("minecraft_version", minecraft_version)
     inputs.property("loader_version", fabric_loader_version)
@@ -61,6 +56,6 @@ java {
     }
 }
 
-tasks.remapJar {
+tasks.jar {
     archiveVersion.set("${project.version}-mc$minecraft_version")
 }
