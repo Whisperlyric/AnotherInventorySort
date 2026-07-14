@@ -18,6 +18,7 @@ repositories {
 }
 
 dependencies {
+    implementation(project(":common"))
     "minecraft"("com.mojang:minecraft:$minecraft_version")
     implementation("net.fabricmc:fabric-loader:$fabric_loader_version")
     implementation("net.fabricmc.fabric-api:fabric-api:$fabric_api_version")
