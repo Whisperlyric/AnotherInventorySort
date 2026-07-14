@@ -133,6 +133,20 @@ public class AnotherInventorySortClient implements ClientModInitializer {
 
                 // Render lock indicators
                 renderLockIndicators(graphics, menu, guiLeft, guiTop);
+
+                // Handle lock drag: apply lock/unlock to slots the mouse drags over
+                if (lockDragActive && isAltHeld()) {
+                    Slot hovered = findSlotAt(menu, mouseX, mouseY, guiLeft, guiTop);
+                    if (hovered != null && hovered.container instanceof Inventory
+                            && LockSlotManager.isLockableSlot(hovered.slot)) {
+                        int invSlot = hovered.slot;
+                        if (lockDragAction == 0 && !LockSlotManager.isSlotLocked(invSlot)) {
+                            LockSlotManager.lockSlot(invSlot);
+                        } else if (lockDragAction == 1 && LockSlotManager.isSlotLocked(invSlot)) {
+                            LockSlotManager.unlockSlot(invSlot);
+                        }
+                    }
+                }
             });
 
             // Mouse click handler
@@ -406,12 +420,19 @@ public class AnotherInventorySortClient implements ClientModInitializer {
     }
 
     private static void renderButtons(GuiGraphicsExtractor graphics, int mouseX, int mouseY, List<SortButtonInfo> buttons) {
+        boolean shiftHeld = isShiftHeld();
         int newHoveredIndex = -1;
         for (int i = 0; i < buttons.size(); i++) {
             SortButtonInfo btn = buttons.get(i);
             boolean hovered = btn.isHovered(mouseX, mouseY);
             float u = btn.textureX;
-            float v = hovered ? BUTTON_SIZE : 0;
+            // Texture layout: v=0 normal, v=10 hover, v=20 shift held
+            float v = 0;
+            if (shiftHeld) {
+                v = 20;
+            } else if (hovered) {
+                v = 10;
+            }
             graphics.blit(RenderPipelines.GUI_TEXTURED, BUTTON_TEXTURE, btn.x, btn.y, u, v,
                     BUTTON_SIZE, BUTTON_SIZE, 128, 128);
             if (hovered) newHoveredIndex = i;
