@@ -28,7 +28,7 @@ public class AnotherInventorySortClient implements ClientModInitializer {
     private static final int BUTTON_SPACING = 12;
     private static final int BUTTON_GAP = 2;
     private static final ResourceLocation BUTTON_TEXTURE = ResourceLocation.fromNamespaceAndPath(
-            "anotherinventorysort", "textures/gui/gui_buttons.png");
+            "anotherinventorysort", "textures/gui/buttons.png");
 
     private static class SortButtonInfo {
         final int x;
