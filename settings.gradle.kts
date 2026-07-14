@@ -9,3 +9,6 @@ pluginManagement {
 }
 
 rootProject.name = "anotherinventorysort"
+
+include("common")
+include("versions:1.21.6")
