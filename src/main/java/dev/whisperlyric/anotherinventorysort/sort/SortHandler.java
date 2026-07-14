@@ -3,7 +3,6 @@ package dev.whisperlyric.anotherinventorysort.sort;
 import dev.whisperlyric.anotherinventorysort.item.ItemWrapper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
@@ -18,13 +17,13 @@ public class SortHandler {
         return !screen.getMenu().slots.isEmpty();
     }
 
-    public static void sortInventory(AbstractContainerScreen<?> screen, SortMode mode) {
+    public static void sortInventory(AbstractContainerScreen<?> screen, SortMode mode, String category) {
         Minecraft client = Minecraft.getInstance();
         if (client.player == null || client.gameMode == null) return;
 
         AbstractContainerMenu menu = screen.getMenu();
-        boolean isPlayerInventory = screen instanceof InventoryScreen;
-        List<Integer> sortableSlots = getSortableSlots(menu, isPlayerInventory);
+        boolean isPlayerInventory = "PURE_BACKPACK".equals(category);
+        List<Integer> sortableSlots = getSortableSlots(menu, isPlayerInventory, category);
         if (sortableSlots.isEmpty()) return;
 
         // Phase 1: Merge same-type items
@@ -429,8 +428,24 @@ public class SortHandler {
 
     // Slot detection
 
-    private static List<Integer> getSortableSlots(AbstractContainerMenu menu, boolean isPlayerInventory) {
+    private static List<Integer> getSortableSlots(AbstractContainerMenu menu, boolean isPlayerInventory, String category) {
         List<Integer> slots = new ArrayList<>();
+
+        // GCA fake player inventory: GENERIC_9x6, sortable slots 18-53 (items 0-35, last 4 rows)
+        if ("GCA_FAKE_PLAYER_INVENTORY".equals(category)) {
+            for (int i = 18; i <= 53 && i < menu.slots.size(); i++) {
+                slots.add(i);
+            }
+            return slots;
+        }
+
+        // GCA fake player ender chest: GENERIC_9x6, sortable slots 27-53 (items 0-26, last 3 rows)
+        if ("GCA_FAKE_PLAYER_ENDER_CHEST".equals(category)) {
+            for (int i = 27; i <= 53 && i < menu.slots.size(); i++) {
+                slots.add(i);
+            }
+            return slots;
+        }
 
         if (isPlayerInventory) {
             for (int i = 0; i < menu.slots.size(); i++) {
