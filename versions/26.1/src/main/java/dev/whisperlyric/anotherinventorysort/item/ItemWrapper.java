@@ -58,12 +58,24 @@ public class ItemWrapper {
         return Math.max(0, 100 - (getDamage() * 100 / maxDamage));
     }
 
+    /**
+     * Deterministic component comparison (replaces hashCode).
+     * Used for stable sorting of items with NBT such as shulker boxes.
+     * Returns <0 / 0 / >0.
+     */
+    public int compareComponents(ItemWrapper other) {
+        // Compare via the string representation of components (deterministic)
+        String a = this.stack.getComponents().toString();
+        String b = other.stack.getComponents().toString();
+        return a.compareTo(b);
+    }
+
     @Override
     public boolean equals(Object obj) {
         if (this == obj) return true;
         if (obj == null || getClass() != obj.getClass()) return false;
         ItemWrapper other = (ItemWrapper) obj;
-        return getId().equals(other.getId());
+        return ItemStack.isSameItemSameComponents(stack, other.stack);
     }
 
     @Override

@@ -1,6 +1,8 @@
 {
-  "category.anotherinventorysort.main": "Another Inventory Sort",
+  "key.category.anotherinventorysort.main": "Another Inventory Sort",
   "anotherinventorysort.button.sort": "Sort",
   "anotherinventorysort.button.sort_column": "Sort by Column",
-  "anotherinventorysort.button.sort_row": "Sort by Row"
+  "anotherinventorysort.button.sort_row": "Sort by Row",
+  "key.anotherinventorysort.sort_at_cursor": "Sort at Cursor",
+  "key.anotherinventorysort.lock_modifier": "Lock Modifier"
 }

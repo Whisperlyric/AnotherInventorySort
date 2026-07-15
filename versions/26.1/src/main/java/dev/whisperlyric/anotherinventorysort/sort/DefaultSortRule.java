@@ -19,6 +19,10 @@ public enum DefaultSortRule {
         int nameCompare = a.getName().compareTo(b.getName());
         if (nameCompare != 0) return nameCompare;
 
+        // Deterministic component comparison (replaces hashCode to ensure stable sorting for NBT items like shulker boxes)
+        int componentCompare = a.compareComponents(b);
+        if (componentCompare != 0) return componentCompare;
+
         if (a.isDamageable() && b.isDamageable()) {
             int durabilityCompare = Integer.compare(b.getDurabilityPercentage(), a.getDurabilityPercentage());
             if (durabilityCompare != 0) return durabilityCompare;

@@ -1,6 +1,8 @@
 {
-  "category.anotherinventorysort.main": "Another Inventory Sort",
+  "key.category.anotherinventorysort.main": "Another Inventory Sort",
   "anotherinventorysort.button.sort": "整理",
   "anotherinventorysort.button.sort_column": "按列整理",
-  "anotherinventorysort.button.sort_row": "按行整理"
+  "anotherinventorysort.button.sort_row": "按行整理",
+  "key.anotherinventorysort.sort_at_cursor": "整理光标所在区域",
+  "key.anotherinventorysort.lock_modifier": "锁定附加键"
 }
