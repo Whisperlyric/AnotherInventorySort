@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * Intercepts all slot click operations at the screen level.
  * Blocks ALL interactions with locked inventory slots, including:
  * - PICKUP (normal click to pick up or place items)
- * - QUICK_MOVE (shift+click transfer)
+ * - QUICK_MOVE (shift+click transfer to/from locked slots)
  * - THROW (Q drop)
  * - SWAP (number key swap)
  * - CLONE (middle-click in creative)
@@ -29,7 +29,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class AbstractContainerScreenMixin {
 
     @Inject(method = "slotClicked", at = @At("HEAD"), cancellable = true)
-    private void onSlotClicked(Slot slot, int slotIndex, int button, ContainerInput action, CallbackInfo ci) {
+    private void onSlotClicked(Slot slot, int slotId, int buttonNum, ContainerInput containerInput, CallbackInfo ci) {
         // Allow the mod's own internal operations (e.g., auto-pickup protection)
         if (LockSlotManager.isProcessingLockedPickups()) return;
 
@@ -44,40 +44,14 @@ public class AbstractContainerScreenMixin {
         if (!isLocked) return;
 
         // Block ALL actions on locked slots
-        switch (action) {
-            case PICKUP:
-                // Block picking up items from locked slots
-                // Also block placing cursor items into locked slots
-                ci.cancel();
-                break;
-            case QUICK_MOVE:
-                // Block shift+click transfer from locked slots
-                ci.cancel();
-                break;
-            case SWAP:
-                // Block number key / offhand swap with locked slots
-                ci.cancel();
-                break;
-            case CLONE:
-                // Block middle-click clone in creative
-                ci.cancel();
-                break;
-            case THROW:
-                // Block Q drop from locked slots
-                ci.cancel();
-                break;
-            case QUICK_CRAFT:
-                // Block drag operations involving locked slots
-                ci.cancel();
-                break;
-            case PICKUP_ALL:
-                // Block double-click collect from locked slots
-                ci.cancel();
-                break;
-            default:
-                // Block any unknown action types on locked slots
-                ci.cancel();
-                break;
-        }
+        // This includes:
+        // - PICKUP: placing items into locked slots
+        // - QUICK_MOVE: shift+click transfer to/from locked slots
+        // - SWAP: number key swap
+        // - THROW: Q drop
+        // - CLONE: creative middle-click
+        // - QUICK_CRAFT: drag operations
+        // - PICKUP_ALL: double-click collect
+        ci.cancel();
     }
 }

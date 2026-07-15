@@ -4,13 +4,14 @@ import dev.whisperlyric.anotherinventorysort.sort.SortHandler;
 import dev.whisperlyric.anotherinventorysort.sort.SortMode;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
@@ -25,6 +26,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.client.renderer.RenderPipelines;
 import org.lwjgl.glfw.GLFW;
 
+import java.nio.file.Path;
 import java.util.*;
 
 public class AnotherInventorySortClient implements ClientModInitializer {
@@ -39,20 +41,38 @@ public class AnotherInventorySortClient implements ClientModInitializer {
     private static boolean lockDragActive = false;
     private static int lockDragAction = -1; // 0 = lock, 1 = unlock
 
-    // Tooltip hover tracking
-    private static final long TOOLTIP_DELAY_MS = 3000;
-    private static int hoveredButtonIndex = -1;
-    private static long hoverStartTime = 0;
-
     // Auto-pickup protection: track previous item state of locked slots
     // Key = inventory slot index, Value = snapshot of the item in that slot
     private static final Map<Integer, ItemStack> previousLockedSlotState = new HashMap<>();
     private static boolean wasScreenOpen = false;
 
+    private static KeyMapping sortAtCursorKey;
+    private static KeyMapping lockModifierKey;
+
     @Override
     public void onInitializeClient() {
-        // Initialize LockSlotManager
-        LockSlotManager.init(FabricLoader.getInstance().getConfigDir().resolve("anotherinventorysort"));
+        Path configDir = FabricLoader.getInstance().getConfigDir().resolve("anotherinventorysort");
+        LockSlotManager.init(configDir);
+
+        // Register custom key mapping category (ref: quickshulker)
+        KeyMapping.Category MAIN_CATEGORY = KeyMapping.Category.register(
+                Identifier.fromNamespaceAndPath("anotherinventorysort", "main"));
+
+        sortAtCursorKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+                "key.anotherinventorysort.sort_at_cursor",
+                InputConstants.Type.MOUSE,
+                GLFW.GLFW_MOUSE_BUTTON_MIDDLE,
+                MAIN_CATEGORY
+        ));
+        System.out.println("[AnotherInventorySort] Registered sortAtCursorKey: " + sortAtCursorKey);
+
+        lockModifierKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+                "key.anotherinventorysort.lock_modifier",
+                InputConstants.Type.KEYSYM,
+                GLFW.GLFW_KEY_LEFT_ALT,
+                MAIN_CATEGORY
+        ));
+        System.out.println("[AnotherInventorySort] Registered lockModifierKey: " + lockModifierKey);
 
         // Track server changes for per-server lock persistence
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
@@ -62,18 +82,19 @@ public class AnotherInventorySortClient implements ClientModInitializer {
             } else {
                 LockSlotManager.setServerId("singleplayer");
             }
-            // Reset auto-pickup tracking on join
+            // Clear state on join; inventory may not be synced yet.
+            // First tick detection will initialize baseline without triggering transfers.
             previousLockedSlotState.clear();
             wasScreenOpen = false;
         });
 
-        // === Prevent Q drop from locked slots when screen is open + Auto-pickup protection ===
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (client.player == null) return;
 
-            // Auto-pickup protection: only when no screen is open
+            // Auto-pickup protection: check both when screen is open and closed.
+            // When open: detect items entering locked slots via PICKUP_ALL/ItemScroller.
+            // When closed: skip one tick after screen close to avoid false positives from manual moves.
             if (client.screen == null) {
-                // After screen closes, skip one tick to avoid detecting manual moves
                 if (wasScreenOpen) {
                     wasScreenOpen = false;
                     updatePreviousState(client);
@@ -81,11 +102,11 @@ public class AnotherInventorySortClient implements ClientModInitializer {
                 }
                 checkLockedSlotsForPickups(client);
             } else {
+                checkLockedSlotsForPickups(client);
                 wasScreenOpen = true;
             }
         });
 
-        // Screen event registration
         ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
             if (!(screen instanceof AbstractContainerScreen<?> containerScreen)) return;
             if (screen instanceof CreativeModeInventoryScreen) return;
@@ -99,6 +120,7 @@ public class AnotherInventorySortClient implements ClientModInitializer {
             final ContainerCategory[] categoryRef = {null};
             final List<SortButtonInfo> buttons = new ArrayList<>();
             final boolean[] initialized = {false};
+            final int[] recheckCount = {0};
 
             // After extract: draw buttons + lock indicators
             ScreenEvents.afterExtract(screen).register((s, graphics, mouseX, mouseY, tickDelta) -> {
@@ -109,110 +131,117 @@ public class AnotherInventorySortClient implements ClientModInitializer {
                         return;
                     }
 
-                    int[] pos = computeButtonArea(menu, category, guiLeft, guiTop);
-                    int slotTopY = pos[0];
-                    int slotRightX = pos[1];
-
-                    int startX = slotRightX - BUTTON_SPACING * 3;
-                    int startY = slotTopY - BUTTON_SIZE - BUTTON_GAP;
-
-                    buttons.add(new SortButtonInfo(startX, startY, 10, SortMode.DEFAULT,
-                            Component.translatable("anotherinventorysort.button.sort")));
-                    buttons.add(new SortButtonInfo(startX + BUTTON_SPACING, startY, 30, SortMode.ROW,
-                            Component.translatable("anotherinventorysort.button.sort_row")));
-                    buttons.add(new SortButtonInfo(startX + BUTTON_SPACING * 2, startY, 20, SortMode.COLUMN,
-                            Component.translatable("anotherinventorysort.button.sort_column")));
-
+                    populateButtons(buttons, menu, category, guiLeft, guiTop);
                     categoryRef[0] = category;
                     initialized[0] = true;
+                }
+
+                if (initialized[0] && recheckCount[0] < 5
+                        && categoryRef[0] == ContainerCategory.SORTABLE_STORAGE
+                        && menu instanceof ChestMenu) {
+                    recheckCount[0]++;
+                    ContainerCategory gca = detectGcaContainer(menu, containerScreen.getTitle());
+                    if (gca != null) {
+                        categoryRef[0] = gca;
+                        populateButtons(buttons, menu, gca, guiLeft, guiTop);
+                        recheckCount[0] = 5;
+                    }
                 }
 
                 if (!buttons.isEmpty()) {
                     renderButtons(graphics, mouseX, mouseY, buttons);
                 }
 
-                // Render lock indicators
                 renderLockIndicators(graphics, menu, guiLeft, guiTop);
 
-                // Handle lock drag: apply lock/unlock to slots the mouse drags over
-                if (lockDragActive && isAltHeld()) {
+                if (lockDragActive && isAltHeld() && menu.getCarried().isEmpty()) {
                     Slot hovered = findSlotAt(menu, mouseX, mouseY, guiLeft, guiTop);
                     if (hovered != null && hovered.container instanceof Inventory
                             && LockSlotManager.isLockableSlot(hovered.slot)) {
                         int invSlot = hovered.slot;
                         if (lockDragAction == 0 && !LockSlotManager.isSlotLocked(invSlot)) {
-                            LockSlotManager.lockSlot(invSlot);
+                            lockSlotSynced(invSlot, hovered.getItem());
                         } else if (lockDragAction == 1 && LockSlotManager.isSlotLocked(invSlot)) {
-                            LockSlotManager.unlockSlot(invSlot);
+                            unlockSlotSynced(invSlot);
                         }
                     }
                 }
             });
 
-            // Mouse click handler
             ScreenMouseEvents.allowMouseClick(screen).register((s, event) -> {
                 if (!initialized[0] || categoryRef[0] == null) return true;
 
                 boolean altHeld = isAltHeld();
-                boolean shiftHeld = isShiftHeld();
 
-                // Shift + right-click on sort buttons: sort ignoring locked slots
-                if (shiftHeld && event.button() == GLFW.GLFW_MOUSE_BUTTON_2) {
-                    for (SortButtonInfo btn : buttons) {
-                        if (btn.isHovered(event.x(), event.y())) {
-                            LockSlotManager.setProcessingLockedPickups(true);
-                            try {
-                                SortHandler.sortInventory(containerScreen, btn.sortMode, categoryRef[0].name(), true);
-                            } finally {
-                                LockSlotManager.setProcessingLockedPickups(false);
-                            }
-                            return false;
+                if (!altHeld && isSortAtCursorButton(event.button())) {
+                    Slot hovered = findSlotAt(menu, event.x(), event.y(), guiLeft, guiTop);
+                    if (hovered != null) {
+                        String sortCategory;
+                        if (hovered.container instanceof Inventory) {
+                            sortCategory = "PURE_BACKPACK";
+                        } else if (categoryRef[0] != ContainerCategory.PURE_BACKPACK) {
+                            sortCategory = categoryRef[0].name();
+                        } else {
+                            return true;
                         }
+                        SortHandler.sortInventory(containerScreen, SortMode.DEFAULT, sortCategory, false);
+                        return false;
                     }
                 }
 
                 // Left click only from here
                 if (event.button() != GLFW.GLFW_MOUSE_BUTTON_LEFT) return true;
 
-                // Check sort buttons first (only when NOT holding Alt)
                 if (!altHeld) {
                     for (SortButtonInfo btn : buttons) {
                         if (btn.isHovered(event.x(), event.y())) {
-                            SortHandler.sortInventory(containerScreen, btn.sortMode, categoryRef[0].name(), false);
+                            String categoryToUse = categoryRef[0].name();
+                            if (recheckCount[0] < 5
+                                    && categoryRef[0] == ContainerCategory.SORTABLE_STORAGE
+                                    && menu instanceof ChestMenu) {
+                                ContainerCategory gca = detectGcaContainer(menu, containerScreen.getTitle());
+                                if (gca != null) {
+                                    categoryRef[0] = gca;
+                                    categoryToUse = gca.name();
+                                    populateButtons(buttons, menu, gca, guiLeft, guiTop);
+                                }
+                                recheckCount[0] = 5;
+                            }
+                            SortHandler.sortInventory(containerScreen, btn.sortMode, categoryToUse, false);
                             return false;
                         }
                     }
                 }
 
-                // Hold Alt + click: lock/unlock slot (IPN behavior)
-                // Only allow locking player inventory (0-35), hotbar, and offhand (40)
-                if (altHeld) {
+                // Lock slot: skip when cursor has item to avoid interfering with ItemScroller LAlt batch transfer
+                if (altHeld && menu.getCarried().isEmpty()) {
                     Slot clickedSlot = findSlotAt(menu, event.x(), event.y(), guiLeft, guiTop);
                     if (clickedSlot != null && clickedSlot.container instanceof Inventory
                             && LockSlotManager.isLockableSlot(clickedSlot.slot)) {
                         int invSlot = clickedSlot.slot;
                         if (lockDragActive) {
-                            // Continue drag: apply same action as drag start
                             if (lockDragAction == 0 && !LockSlotManager.isSlotLocked(invSlot)) {
-                                LockSlotManager.lockSlot(invSlot);
+                                lockSlotSynced(invSlot, clickedSlot.getItem());
                             } else if (lockDragAction == 1 && LockSlotManager.isSlotLocked(invSlot)) {
-                                LockSlotManager.unlockSlot(invSlot);
+                                unlockSlotSynced(invSlot);
                             }
                         } else {
-                            // Start of drag
                             boolean wasLocked = LockSlotManager.isSlotLocked(invSlot);
                             lockDragAction = wasLocked ? 1 : 0;
-                            LockSlotManager.toggleSlot(invSlot);
+                            if (wasLocked) {
+                                unlockSlotSynced(invSlot);
+                            } else {
+                                lockSlotSynced(invSlot, clickedSlot.getItem());
+                            }
                             lockDragActive = true;
                         }
-                        return false; // consume click
+                        return false;
                     }
                 }
 
                 return true;
             });
 
-            // Mouse release: end drag
             ScreenMouseEvents.allowMouseRelease(screen).register((s, event) -> {
                 if (event.button() == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
                     lockDragActive = false;
@@ -223,21 +252,30 @@ public class AnotherInventorySortClient implements ClientModInitializer {
         });
     }
 
-    // Check if Left Alt is currently held down
     private static boolean isAltHeld() {
+        if (lockModifierKey == null) return false;
+        InputConstants.Key boundKey = KeyMappingHelper.getBoundKeyOf(lockModifierKey);
+        if (boundKey == null) return false;
         var window = Minecraft.getInstance().getWindow();
-        return InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_ALT)
-                || InputConstants.isKeyDown(window, GLFW.GLFW_KEY_RIGHT_ALT);
+        if (boundKey.getType() == InputConstants.Type.KEYSYM) {
+            return InputConstants.isKeyDown(window, boundKey.getValue());
+        } else if (boundKey.getType() == InputConstants.Type.MOUSE) {
+            return GLFW.glfwGetMouseButton(window.handle(), boundKey.getValue()) == GLFW.GLFW_PRESS;
+        }
+        return false;
     }
 
-    // Check if Shift is currently held down
+    private static boolean isSortAtCursorButton(int button) {
+        if (sortAtCursorKey == null) return false;
+        InputConstants.Key boundKey = KeyMappingHelper.getBoundKeyOf(sortAtCursorKey);
+        return boundKey.getType() == InputConstants.Type.MOUSE && boundKey.getValue() == button;
+    }
+
     private static boolean isShiftHeld() {
         var window = Minecraft.getInstance().getWindow();
-        return InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_SHIFT)
-                || InputConstants.isKeyDown(window, GLFW.GLFW_KEY_RIGHT_SHIFT);
+        return InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_SHIFT);
     }
 
-    // Find which slot is at the given screen coordinates
     private static Slot findSlotAt(AbstractContainerMenu menu, double mouseX, double mouseY,
                                     int guiLeft, int guiTop) {
         for (int i = 0; i < menu.slots.size(); i++) {
@@ -251,7 +289,6 @@ public class AnotherInventorySortClient implements ClientModInitializer {
         return null;
     }
 
-    // Render lock indicators on locked slots (hotbar 0-8, main inventory 9-35, offhand 40)
     private static void renderLockIndicators(GuiGraphicsExtractor graphics, AbstractContainerMenu menu,
                                               int guiLeft, int guiTop) {
         for (int i = 0; i < menu.slots.size(); i++) {
@@ -261,17 +298,12 @@ public class AnotherInventorySortClient implements ClientModInitializer {
                 int slotX = guiLeft + slot.x;
                 int slotY = guiTop + slot.y;
 
-                // Background highlight (red tint)
                 graphics.fill(slotX, slotY, slotX + 16, slotY + 16, 0x80FF5555);
-
-                // Foreground lock icon
                 graphics.blit(RenderPipelines.GUI_TEXTURED, BUTTON_TEXTURE, slotX - 1, slotY - 1, 0, 120,
                         6, 8, 128, 128);
             }
         }
     }
-
-    // ===== Container category =====
 
     private enum ContainerCategory {
         SORTABLE_STORAGE,
@@ -325,7 +357,19 @@ public class AnotherInventorySortClient implements ClientModInitializer {
         return ContainerCategory.GCA_FAKE_PLAYER_INVENTORY;
     }
 
-    // ===== Compute button area =====
+    // Compute button area
+
+    /** Compute button positions based on category and populate the buttons list (shared by init and re-detect). */
+    private static void populateButtons(List<SortButtonInfo> buttons, AbstractContainerMenu menu,
+                                         ContainerCategory category, int guiLeft, int guiTop) {
+        buttons.clear();
+        int[] pos = computeButtonArea(menu, category, guiLeft, guiTop);
+        int startX = pos[1] - BUTTON_SPACING * 3;
+        int startY = pos[0] - BUTTON_SIZE - BUTTON_GAP;
+        buttons.add(new SortButtonInfo(startX, startY, 10, SortMode.DEFAULT));
+        buttons.add(new SortButtonInfo(startX + BUTTON_SPACING, startY, 20, SortMode.ROW));
+        buttons.add(new SortButtonInfo(startX + BUTTON_SPACING * 2, startY, 30, SortMode.COLUMN));
+    }
 
     private static int[] computeButtonArea(AbstractContainerMenu menu, ContainerCategory category,
                                             int guiLeft, int guiTop) {
@@ -397,21 +441,17 @@ public class AnotherInventorySortClient implements ClientModInitializer {
         return new int[]{topY, rightX};
     }
 
-    // ===== Render =====
-
     private static class SortButtonInfo {
         final int x;
         final int y;
         final int textureX;
         final SortMode sortMode;
-        final Component tooltip;
 
-        SortButtonInfo(int x, int y, int textureX, SortMode sortMode, Component tooltip) {
+        SortButtonInfo(int x, int y, int textureX, SortMode sortMode) {
             this.x = x;
             this.y = y;
             this.textureX = textureX;
             this.sortMode = sortMode;
-            this.tooltip = tooltip;
         }
 
         boolean isHovered(double mouseX, double mouseY) {
@@ -420,38 +460,26 @@ public class AnotherInventorySortClient implements ClientModInitializer {
     }
 
     private static void renderButtons(GuiGraphicsExtractor graphics, int mouseX, int mouseY, List<SortButtonInfo> buttons) {
-        boolean shiftHeld = isShiftHeld();
-        int newHoveredIndex = -1;
-        for (int i = 0; i < buttons.size(); i++) {
-            SortButtonInfo btn = buttons.get(i);
+        for (SortButtonInfo btn : buttons) {
             boolean hovered = btn.isHovered(mouseX, mouseY);
             float u = btn.textureX;
-            float shift = shiftHeld ? 1 : 0;
-            float hover = hovered ? 1 : 0;
-            float v = shift * 20 + hover * 10 + (shiftHeld && hovered ? 10 : 0);
+            float v = hovered ? 10 : 0;
             graphics.blit(RenderPipelines.GUI_TEXTURED, BUTTON_TEXTURE, btn.x, btn.y, u, v,
                     BUTTON_SIZE, BUTTON_SIZE, 128, 128);
-            if (hovered) newHoveredIndex = i;
-        }
-
-        // Track hover duration for tooltip delay
-        if (newHoveredIndex >= 0) {
-            if (newHoveredIndex != hoveredButtonIndex) {
-                hoveredButtonIndex = newHoveredIndex;
-                hoverStartTime = System.currentTimeMillis();
-            }
-            if (System.currentTimeMillis() - hoverStartTime >= TOOLTIP_DELAY_MS) {
-                SortButtonInfo btn = buttons.get(newHoveredIndex);
-                Font font = Minecraft.getInstance().font;
-                graphics.setTooltipForNextFrame(font, btn.tooltip, (int) mouseX, (int) mouseY);
-            }
-        } else {
-            hoveredButtonIndex = -1;
-            hoverStartTime = 0;
         }
     }
 
-    // ===== Auto-pickup protection =====
+    /** Lock a slot and sync previousLockedSlotState to avoid false "item entered locked slot" detection on next tick. */
+    private static void lockSlotSynced(int invSlot, ItemStack current_item) {
+        LockSlotManager.lockSlot(invSlot);
+        previousLockedSlotState.put(invSlot, current_item.copy());
+    }
+
+    /** Unlock a slot and sync previousLockedSlotState. */
+    private static void unlockSlotSynced(int invSlot) {
+        LockSlotManager.unlockSlot(invSlot);
+        previousLockedSlotState.remove(invSlot);
+    }
 
     private static void updatePreviousState(Minecraft client) {
         previousLockedSlotState.clear();
@@ -474,26 +502,32 @@ public class AnotherInventorySortClient implements ClientModInitializer {
             for (int invSlot : LockSlotManager.getLockedSlots()) {
                 if (!LockSlotManager.isLockableSlot(invSlot)) continue;
 
-                ItemStack previous = previousLockedSlotState.getOrDefault(invSlot, ItemStack.EMPTY);
                 ItemStack current = inv.getItem(invSlot);
 
+                // First detection after join: record baseline only, skip transfer.
+                // This avoids false positives when inventory hasn't synced yet.
+                if (!previousLockedSlotState.containsKey(invSlot)) {
+                    previousLockedSlotState.put(invSlot, current.copy());
+                    continue;
+                }
+
+                ItemStack previous = previousLockedSlotState.getOrDefault(invSlot, ItemStack.EMPTY);
+
                 boolean changed = false;
+                int previousCount = previous.isEmpty() ? 0 : previous.getCount();
 
                 if (previous.isEmpty() && !current.isEmpty()) {
-                    // Item was picked up into an empty locked slot — move it out entirely
+                    // Scenario 1: item placed into an empty locked slot — move the whole stack out
                     changed = true;
                 } else if (!previous.isEmpty() && !current.isEmpty()) {
-                    // Check if items were merged into a non-empty locked slot
                     if (ItemStack.isSameItemSameComponents(previous, current) && current.getCount() > previous.getCount()) {
-                        // Same-type items were merged into this locked slot (count increased)
+                        // Scenario 2: same-type item merged into locked slot — remove only the excess count
                         changed = true;
                     } else if (!ItemStack.isSameItemSameComponents(previous, current)) {
-                        // Different item was placed into the locked slot
+                        // Scenario 3: different-type item placed into locked slot — move the whole stack out
                         changed = true;
                     }
                 }
-                // If previous was non-empty and current is empty, item was removed from locked slot
-                // (e.g., by carpet command) — we can't bring it back, just update state
 
                 if (changed) {
                     int menuSlotIndex = findMenuSlotForInvSlot(menu, invSlot);
@@ -502,21 +536,52 @@ public class AnotherInventorySortClient implements ClientModInitializer {
                         continue;
                     }
 
-                    // Move the entire item out of the locked slot
-                    // For same-type merges, we can't split stacks precisely via container clicks,
-                    // so we move the whole stack out to protect the locked slot
-                    int targetMenuSlot = findFirstNonLockedEmptySlot(menu, inv);
+                    boolean sameTypeMerge = !previous.isEmpty() && !current.isEmpty()
+                            && ItemStack.isSameItemSameComponents(previous, current)
+                            && current.getCount() > previousCount;
 
-                    if (targetMenuSlot >= 0) {
-                        int containerId = menu.containerId;
+                    int containerId = menu.containerId;
+                    // Scenario 2 requires an empty cursor; otherwise PICKUP would swap items and break the logic.
+                    boolean carriedEmpty = menu.getCarried().isEmpty();
+
+                    if (sameTypeMerge && carriedEmpty) {
+                        // Scenario 2: remove only the excess count.
+                        // Prerequisite: cursor is empty. PICKUP whole stack to cursor → right-click locked slot
+                        // previousCount times (puts back 1 each) → transfer remaining (excess) to a non-locked slot.
+                        int targetMenuSlot = findFirstNonLockedEmptySlot(menu, inv);
+
+                        // 1. PICKUP the whole stack to cursor
                         client.gameMode.handleContainerInput(containerId, menuSlotIndex, 0,
                                 ContainerInput.PICKUP, client.player);
-                        client.gameMode.handleContainerInput(containerId, targetMenuSlot, 0,
-                                ContainerInput.PICKUP, client.player);
+
+                        // 2. Right-click the locked slot previousCount times to put back 1 item each click
+                        for (int i = 0; i < previousCount; i++) {
+                            if (menu.getCarried().isEmpty()) break;
+                            client.gameMode.handleContainerInput(containerId, menuSlotIndex, 1,
+                                    ContainerInput.PICKUP, client.player);
+                        }
+
+                        // 3. Transfer the remaining (excess) items on cursor to a non-locked empty slot.
+                        // Note: THROW targets a slot, not the cursor — it cannot be used to discard cursor items.
+                        // If no empty slot is available, the cursor items are left as-is (cannot be safely discarded).
+                        if (!menu.getCarried().isEmpty() && targetMenuSlot >= 0) {
+                            client.gameMode.handleContainerInput(containerId, targetMenuSlot, 0,
+                                    ContainerInput.PICKUP, client.player);
+                        }
+                        // If no empty slot: excess items remain on cursor (locked slot is untouched).
                     } else {
-                        int containerId = menu.containerId;
-                        client.gameMode.handleContainerInput(containerId, menuSlotIndex, 0,
-                                ContainerInput.THROW, client.player);
+                        // Scenario 1/3: move the whole stack out (also the fallback when cursor is non-empty).
+                        int targetMenuSlot = findFirstNonLockedEmptySlot(menu, inv);
+                        if (targetMenuSlot >= 0) {
+                            client.gameMode.handleContainerInput(containerId, menuSlotIndex, 0,
+                                    ContainerInput.PICKUP, client.player);
+                            client.gameMode.handleContainerInput(containerId, targetMenuSlot, 0,
+                                    ContainerInput.PICKUP, client.player);
+                        } else {
+                            // Inventory full of no empty slot: Ctrl+Q (button=1) throws the whole stack out.
+                            client.gameMode.handleContainerInput(containerId, menuSlotIndex, 1,
+                                    ContainerInput.THROW, client.player);
+                        }
                     }
                 }
 
