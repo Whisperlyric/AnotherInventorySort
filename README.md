@@ -16,16 +16,16 @@ A simple Minecraft inventory sorting mod for Fabric.
 
 ## Supported Versions
 
-| Minecraft | Status |
-|-----------|--------|
-| 1.20.1    | Supported |
-| 1.20.5    | Supported |
-| 1.21.1    | Supported |
-| 1.21.2    | Supported |
-| 1.21.6    | Supported |
-| 1.21.9    | Supported |
-| 1.21.11   | Supported |
-| 26.1      | Supported |
+| Version | Supported Versions | Status |
+|-----------|---------|--------|
+| 1.20.1    |1.20-1.20.4 | Supported |
+| 1.20.5    |1.20.5-1.20.6 | Supported |
+| 1.21.1    |1.21-1.21.1 | Supported |
+| 1.21.2    |1.21.2-1.21.5 | Supported |
+| 1.21.6    |1.21.6-1.21.8 | Supported |
+| 1.21.9    |1.21.9-1.21.10 | Supported |
+| 1.21.11   |1.21.11 | Supported |
+| 26.1      |26.1-26.2 |  Supported |
 
 ## Requirements
 
