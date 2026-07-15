@@ -426,13 +426,9 @@ public class AnotherInventorySortClient implements ClientModInitializer {
             SortButtonInfo btn = buttons.get(i);
             boolean hovered = btn.isHovered(mouseX, mouseY);
             float u = btn.textureX;
-            // Texture layout: v=0 normal, v=10 hover, v=20 shift held
-            float v = 0;
-            if (shiftHeld) {
-                v = 20;
-            } else if (hovered) {
-                v = 10;
-            }
+            float shift = shiftHeld ? 1 : 0;
+            float hover = hovered ? 1 : 0;
+            float v = shift * 20 + hover * 10 + (shiftHeld && hovered ? 10 : 0);
             graphics.blit(RenderPipelines.GUI_TEXTURED, BUTTON_TEXTURE, btn.x, btn.y, u, v,
                     BUTTON_SIZE, BUTTON_SIZE, 128, 128);
             if (hovered) newHoveredIndex = i;
