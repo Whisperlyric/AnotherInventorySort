@@ -16,7 +16,7 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-// import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -119,7 +119,7 @@ public class AnotherInventorySortClient implements ClientModInitializer {
 
         ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
             if (!(screen instanceof AbstractContainerScreen<?> containerScreen)) return;
-            // if (screen instanceof CreativeModeInventoryScreen) return;
+            if (screen instanceof CreativeModeInventoryScreen) return;
             AbstractContainerMenu menu = containerScreen.getMenu();
             if (isNonStorage(menu)) return;
 
@@ -166,17 +166,21 @@ public class AnotherInventorySortClient implements ClientModInitializer {
                     renderTransferButtons(graphics, mouseX, mouseY, transferButtons);
                 }
 
-                renderLockIndicators(graphics, menu, guiLeft, guiTop);
+                // Lock indicators and drag-lock: disabled in creative mode
+                boolean isCreative = client.player != null && client.player.isCreative();
+                if (!isCreative) {
+                    renderLockIndicators(graphics, menu, guiLeft, guiTop);
 
-                if (lockDragActive && isAltHeld() && menu.getCarried().isEmpty()) {
-                    Slot hovered = findSlotAt(menu, mouseX, mouseY, guiLeft, guiTop);
-                    if (hovered != null && hovered.container instanceof Inventory
-                            && LockSlotManager.isLockableSlot(hovered.slot)) {
-                        int invSlot = hovered.slot;
-                        if (lockDragAction == 0 && !LockSlotManager.isSlotLocked(invSlot)) {
-                            lockSlotSynced(invSlot, hovered.getItem());
-                        } else if (lockDragAction == 1 && LockSlotManager.isSlotLocked(invSlot)) {
-                            unlockSlotSynced(invSlot);
+                    if (lockDragActive && isAltHeld() && menu.getCarried().isEmpty()) {
+                        Slot hovered = findSlotAt(menu, mouseX, mouseY, guiLeft, guiTop);
+                        if (hovered != null && hovered.container instanceof Inventory
+                                && LockSlotManager.isLockableSlot(hovered.slot)) {
+                            int invSlot = hovered.slot;
+                            if (lockDragAction == 0 && !LockSlotManager.isSlotLocked(invSlot)) {
+                                lockSlotSynced(invSlot, hovered.getItem());
+                            } else if (lockDragAction == 1 && LockSlotManager.isSlotLocked(invSlot)) {
+                                unlockSlotSynced(invSlot);
+                            }
                         }
                     }
                 }
@@ -187,6 +191,7 @@ public class AnotherInventorySortClient implements ClientModInitializer {
 
                 boolean altHeld = isAltHeld();
                 boolean shiftHeld = isShiftHeld();
+                boolean isCreative = client.player != null && client.player.isCreative();
 
                 if (!altHeld && isSortAtCursorButton(event.button())) {
                     Slot hovered = findSlotAt(menu, event.x(), event.y(), guiLeft, guiTop);
@@ -245,7 +250,8 @@ public class AnotherInventorySortClient implements ClientModInitializer {
                 }
 
                 // Lock slot: skip when cursor has item to avoid interfering with ItemScroller LAlt batch transfer
-                if (altHeld && menu.getCarried().isEmpty()) {
+                // Also disabled in creative mode
+                if (altHeld && !isCreative && menu.getCarried().isEmpty()) {
                     Slot clickedSlot = findSlotAt(menu, event.x(), event.y(), guiLeft, guiTop);
                     if (clickedSlot != null && clickedSlot.container instanceof Inventory
                             && LockSlotManager.isLockableSlot(clickedSlot.slot)) {
@@ -570,7 +576,10 @@ public class AnotherInventorySortClient implements ClientModInitializer {
     }
 
     private static void checkLockedSlotsForPickups(Minecraft client) {
+        // Skip in creative mode
         if (client.player == null || client.gameMode == null || client.level == null) return;
+        if (client.player.isCreative()) return;
+
         Inventory inv = client.player.getInventory();
         var menu = client.player.containerMenu;
 
