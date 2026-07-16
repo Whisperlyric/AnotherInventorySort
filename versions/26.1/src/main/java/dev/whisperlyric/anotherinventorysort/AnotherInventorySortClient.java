@@ -2,6 +2,8 @@ package dev.whisperlyric.anotherinventorysort;
 
 import dev.whisperlyric.anotherinventorysort.sort.SortHandler;
 import dev.whisperlyric.anotherinventorysort.sort.SortMode;
+import dev.whisperlyric.anotherinventorysort.transfer.TransferHandler;
+import dev.whisperlyric.anotherinventorysort.transfer.TransferMode;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
@@ -48,13 +50,14 @@ public class AnotherInventorySortClient implements ClientModInitializer {
 
     private static KeyMapping sortAtCursorKey;
     private static KeyMapping lockModifierKey;
+    private static KeyMapping transferModifierKey;
 
     @Override
     public void onInitializeClient() {
         Path configDir = FabricLoader.getInstance().getConfigDir().resolve("anotherinventorysort");
         LockSlotManager.init(configDir);
 
-        // Register custom key mapping category (ref: quickshulker)
+        // Register custom key mapping category
         KeyMapping.Category MAIN_CATEGORY = KeyMapping.Category.register(
                 Identifier.fromNamespaceAndPath("anotherinventorysort", "main"));
 
@@ -64,7 +67,6 @@ public class AnotherInventorySortClient implements ClientModInitializer {
                 GLFW.GLFW_MOUSE_BUTTON_MIDDLE,
                 MAIN_CATEGORY
         ));
-        System.out.println("[AnotherInventorySort] Registered sortAtCursorKey: " + sortAtCursorKey);
 
         lockModifierKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
                 "key.anotherinventorysort.lock_modifier",
@@ -72,7 +74,13 @@ public class AnotherInventorySortClient implements ClientModInitializer {
                 GLFW.GLFW_KEY_LEFT_ALT,
                 MAIN_CATEGORY
         ));
-        System.out.println("[AnotherInventorySort] Registered lockModifierKey: " + lockModifierKey);
+
+        transferModifierKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+                "key.anotherinventorysort.transfer_all",
+                InputConstants.Type.KEYSYM,
+                GLFW.GLFW_KEY_LEFT_SHIFT,
+                MAIN_CATEGORY
+        ));
 
         // Track server changes for per-server lock persistence
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
@@ -118,7 +126,8 @@ public class AnotherInventorySortClient implements ClientModInitializer {
             int guiTop = containerScreen.topPos;
 
             final ContainerCategory[] categoryRef = {null};
-            final List<SortButtonInfo> buttons = new ArrayList<>();
+            final List<SortButtonInfo> sortButtons = new ArrayList<>();
+            final List<TransferButtonInfo> transferButtons = new ArrayList<>();
             final boolean[] initialized = {false};
             final int[] recheckCount = {0};
 
@@ -131,7 +140,7 @@ public class AnotherInventorySortClient implements ClientModInitializer {
                         return;
                     }
 
-                    populateButtons(buttons, menu, category, guiLeft, guiTop);
+                    populateButtons(sortButtons, transferButtons, menu, category, guiLeft, guiTop);
                     categoryRef[0] = category;
                     initialized[0] = true;
                 }
@@ -141,15 +150,19 @@ public class AnotherInventorySortClient implements ClientModInitializer {
                         && menu instanceof ChestMenu) {
                     recheckCount[0]++;
                     ContainerCategory gca = detectGcaContainer(menu, containerScreen.getTitle());
-                    if (gca != null) {
-                        categoryRef[0] = gca;
-                        populateButtons(buttons, menu, gca, guiLeft, guiTop);
-                        recheckCount[0] = 5;
-                    }
+                        if (gca != null) {
+                            categoryRef[0] = gca;
+                            populateButtons(sortButtons, transferButtons, menu, gca, guiLeft, guiTop);
+                            recheckCount[0] = 5;
+                        }
                 }
 
-                if (!buttons.isEmpty()) {
-                    renderButtons(graphics, mouseX, mouseY, buttons);
+                if (!sortButtons.isEmpty()) {
+                    renderSortButtons(graphics, mouseX, mouseY, sortButtons);
+                }
+
+                if (!transferButtons.isEmpty()) {
+                    renderTransferButtons(graphics, mouseX, mouseY, transferButtons);
                 }
 
                 renderLockIndicators(graphics, menu, guiLeft, guiTop);
@@ -172,6 +185,7 @@ public class AnotherInventorySortClient implements ClientModInitializer {
                 if (!initialized[0] || categoryRef[0] == null) return true;
 
                 boolean altHeld = isAltHeld();
+                boolean shiftHeld = isShiftHeld();
 
                 if (!altHeld && isSortAtCursorButton(event.button())) {
                     Slot hovered = findSlotAt(menu, event.x(), event.y(), guiLeft, guiTop);
@@ -192,8 +206,24 @@ public class AnotherInventorySortClient implements ClientModInitializer {
                 // Left click only from here
                 if (event.button() != GLFW.GLFW_MOUSE_BUTTON_LEFT) return true;
 
+                // Handle transfer button clicks
+                if (!transferButtons.isEmpty()) {
+                    for (TransferButtonInfo btn : transferButtons) {
+                        if (btn.isHovered(event.x(), event.y())) {
+                            // Determine transfer mode and execute transfer
+                            TransferMode mode = shiftHeld
+                                    ? (btn.playerToContainer ? TransferMode.ALL_TRANSFER_TO_CONTAINER : TransferMode.ALL_TRANSFER_TO_PLAYER)
+                                    : (btn.playerToContainer ? TransferMode.MATCHING_TRANSFER_TO_CONTAINER : TransferMode.MATCHING_TRANSFER_TO_PLAYER);
+
+                            TransferHandler handler = new TransferHandler();
+                            handler.executeTransfer(menu, mode, LockSlotManager.getLockedSlots());
+                            return false;
+                        }
+                    }
+                }
+
                 if (!altHeld) {
-                    for (SortButtonInfo btn : buttons) {
+                    for (SortButtonInfo btn : sortButtons) {
                         if (btn.isHovered(event.x(), event.y())) {
                             String categoryToUse = categoryRef[0].name();
                             if (recheckCount[0] < 5
@@ -203,7 +233,7 @@ public class AnotherInventorySortClient implements ClientModInitializer {
                                 if (gca != null) {
                                     categoryRef[0] = gca;
                                     categoryToUse = gca.name();
-                                    populateButtons(buttons, menu, gca, guiLeft, guiTop);
+                                    populateButtons(sortButtons, transferButtons, menu, gca, guiLeft, guiTop);
                                 }
                                 recheckCount[0] = 5;
                             }
@@ -265,15 +295,23 @@ public class AnotherInventorySortClient implements ClientModInitializer {
         return false;
     }
 
+    private static boolean isShiftHeld() {
+        if (transferModifierKey == null) return false;
+        InputConstants.Key boundKey = KeyMappingHelper.getBoundKeyOf(transferModifierKey);
+        if (boundKey == null) return false;
+        var window = Minecraft.getInstance().getWindow();
+        if (boundKey.getType() == InputConstants.Type.KEYSYM) {
+            return InputConstants.isKeyDown(window, boundKey.getValue());
+        } else if (boundKey.getType() == InputConstants.Type.MOUSE) {
+            return GLFW.glfwGetMouseButton(window.handle(), boundKey.getValue()) == GLFW.GLFW_PRESS;
+        }
+        return false;
+    }
+
     private static boolean isSortAtCursorButton(int button) {
         if (sortAtCursorKey == null) return false;
         InputConstants.Key boundKey = KeyMappingHelper.getBoundKeyOf(sortAtCursorKey);
         return boundKey.getType() == InputConstants.Type.MOUSE && boundKey.getValue() == button;
-    }
-
-    private static boolean isShiftHeld() {
-        var window = Minecraft.getInstance().getWindow();
-        return InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_SHIFT);
     }
 
     private static Slot findSlotAt(AbstractContainerMenu menu, double mouseX, double mouseY,
@@ -360,37 +398,34 @@ public class AnotherInventorySortClient implements ClientModInitializer {
     // Compute button area
 
     /** Compute button positions based on category and populate the buttons list (shared by init and re-detect). */
-    private static void populateButtons(List<SortButtonInfo> buttons, AbstractContainerMenu menu,
-                                         ContainerCategory category, int guiLeft, int guiTop) {
-        buttons.clear();
+    private static void populateButtons(List<SortButtonInfo> sortButtons, List<TransferButtonInfo> transferButtons,
+                                         AbstractContainerMenu menu, ContainerCategory category, int guiLeft, int guiTop) {
+        sortButtons.clear();
+        transferButtons.clear();
+
+        // Sort buttons
         int[] pos = computeButtonArea(menu, category, guiLeft, guiTop);
         int startX = pos[1] - BUTTON_SPACING * 3;
-        int startY = pos[0] - BUTTON_SIZE - BUTTON_GAP;
-        buttons.add(new SortButtonInfo(startX, startY, 10, SortMode.DEFAULT));
-        buttons.add(new SortButtonInfo(startX + BUTTON_SPACING, startY, 20, SortMode.ROW));
-        buttons.add(new SortButtonInfo(startX + BUTTON_SPACING * 2, startY, 30, SortMode.COLUMN));
+        int startY = pos[0] - BUTTON_SPACING;
+        sortButtons.add(new SortButtonInfo(startX, startY, 10, SortMode.DEFAULT));
+        sortButtons.add(new SortButtonInfo(startX + BUTTON_SPACING, startY, 20, SortMode.ROW));
+        sortButtons.add(new SortButtonInfo(startX + BUTTON_SPACING * 2, startY, 30, SortMode.COLUMN));
+
+        // Transfer buttons
+        if (category == ContainerCategory.SORTABLE_STORAGE) {
+            int[] transferPos = computeTransferButtonArea(menu, guiLeft, guiTop);
+            transferButtons.add(new TransferButtonInfo(startX + BUTTON_SPACING, transferPos[0], true));
+            transferButtons.add(new TransferButtonInfo(startX + BUTTON_SPACING * 2, transferPos[0], false));
+        }
     }
 
     private static int[] computeButtonArea(AbstractContainerMenu menu, ContainerCategory category,
                                             int guiLeft, int guiTop) {
-        switch (category) {
-            case SORTABLE_STORAGE:
-                return findContainerSlotArea(menu, guiLeft, guiTop);
-            case GCA_FAKE_PLAYER_INVENTORY:
-            case GCA_FAKE_PLAYER_ENDER_CHEST:
-                int firstSlotY = -1;
-                for (int i = 0; i < menu.slots.size(); i++) {
-                    Slot slot = menu.getSlot(i);
-                    if (!(slot.container instanceof Inventory)) {
-                        firstSlotY = slot.y;
-                        break;
-                    }
-                }
-                if (firstSlotY < 0) firstSlotY = 17;
-                return new int[]{guiTop + firstSlotY, guiLeft + 176 - 7};
-            default:
-                return findPlayerStorageArea(menu, guiLeft, guiTop);
-        }
+        return switch (category) {
+            case SORTABLE_STORAGE, GCA_FAKE_PLAYER_INVENTORY, GCA_FAKE_PLAYER_ENDER_CHEST ->
+                    new int[]{guiTop + 17, guiLeft + 176 - 7};
+            default -> findPlayerStorageArea(menu, guiLeft, guiTop);
+        };
     }
 
     private static int[] findContainerSlotArea(AbstractContainerMenu menu, int guiLeft, int guiTop) {
@@ -434,6 +469,44 @@ public class AnotherInventorySortClient implements ClientModInitializer {
         return new int[]{guiTop + 5, guiLeft + 176 - 7};
     }
 
+    /** Compute transfer button position: between container and player inventory */
+    private static int[] computeTransferButtonArea(AbstractContainerMenu menu, int guiLeft, int guiTop) {
+        // Find the bottom of container slots and top of player inventory
+        int containerBottom = -1;
+        int playerTop = -1;
+
+        for (int i = 0; i < menu.slots.size(); i++) {
+            Slot slot = menu.getSlot(i);
+            int slotY = guiTop + slot.y;
+
+            if (!(slot.container instanceof Inventory)) {
+                // Container slot - find bottom
+                if (containerBottom == -1 || slotY > containerBottom) {
+                    containerBottom = slotY;
+                }
+            } else if (slot.slot >= 9 && slot.slot <= 35) {
+                // Player storage slot - find top
+                if (playerTop == -1 || slotY < playerTop) {
+                    playerTop = slotY;
+                }
+            }
+        }
+
+        // Place buttons in the middle between container and player inventory
+        int buttonY;
+        if (containerBottom >= 0 && playerTop >= 0) {
+            buttonY = (containerBottom + playerTop) / 2;
+        } else if (containerBottom >= 0) {
+            buttonY = containerBottom + BUTTON_GAP;
+        } else if (playerTop >= 0) {
+            buttonY = playerTop - BUTTON_SIZE - BUTTON_GAP;
+        } else {
+            buttonY = guiTop + 84;
+        }
+
+        return new int[]{buttonY + 4, guiLeft + 176 - 7};
+    }
+
     private static int[] fallbackIfNeeded(int topY, int rightX, int guiLeft, int guiTop) {
         if (topY == -1) {
             return new int[]{guiTop + 5, guiLeft + 176 - 7};
@@ -459,11 +532,40 @@ public class AnotherInventorySortClient implements ClientModInitializer {
         }
     }
 
-    private static void renderButtons(GuiGraphicsExtractor graphics, int mouseX, int mouseY, List<SortButtonInfo> buttons) {
-        for (SortButtonInfo btn : buttons) {
+    private static class TransferButtonInfo {
+        final int x;
+        final int y;
+        final boolean playerToContainer; // true = up arrow, false = down arrow
+
+        TransferButtonInfo(int x, int y, boolean playerToContainer) {
+            this.x = x;
+            this.y = y;
+            this.playerToContainer = playerToContainer;
+        }
+
+        boolean isHovered(double mouseX, double mouseY) {
+            return mouseX >= x && mouseX < x + BUTTON_SIZE && mouseY >= y && mouseY < y + BUTTON_SIZE;
+        }
+    }
+
+    private static void renderSortButtons(GuiGraphicsExtractor graphics, int mouseX, int mouseY, List<SortButtonInfo> sortButtons) {
+        for (SortButtonInfo btn : sortButtons) {
             boolean hovered = btn.isHovered(mouseX, mouseY);
             float u = btn.textureX;
             float v = hovered ? 10 : 0;
+            graphics.blit(RenderPipelines.GUI_TEXTURED, BUTTON_TEXTURE, btn.x, btn.y, u, v,
+                    BUTTON_SIZE, BUTTON_SIZE, 128, 128);
+        }
+    }
+
+    private static void renderTransferButtons(GuiGraphicsExtractor graphics, int mouseX, int mouseY, List<TransferButtonInfo> transferButtons) {
+        for (TransferButtonInfo btn : transferButtons) {
+            boolean hovered = btn.isHovered(mouseX, mouseY);
+            boolean transferAll = isShiftHeld();
+
+            float u = btn.playerToContainer ? 50 : 40;
+            float v = (transferAll ? 20 : 0) + (hovered ? 10 : 0);
+
             graphics.blit(RenderPipelines.GUI_TEXTURED, BUTTON_TEXTURE, btn.x, btn.y, u, v,
                     BUTTON_SIZE, BUTTON_SIZE, 128, 128);
         }

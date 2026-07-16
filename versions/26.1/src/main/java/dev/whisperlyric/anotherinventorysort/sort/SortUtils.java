@@ -25,7 +25,7 @@ public final class SortUtils {
     }
 
     /**
-     * IPN's distribute algorithm: allocate width into columnsCount column blocks.
+     * Distribute algorithm: allocate width into columnsCount column blocks.
      * distribute(9, 2) → [5, 4]
      * distribute(9, 3) → [3, 3, 3]
      */
