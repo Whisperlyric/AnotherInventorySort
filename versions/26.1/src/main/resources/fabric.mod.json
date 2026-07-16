@@ -13,7 +13,8 @@
   "license": "MIT",
   "environment": "client",
   "entrypoints": {
-    "client": ["dev.whisperlyric.anotherinventorysort.AnotherInventorySortClient"]
+    "client": ["dev.whisperlyric.anotherinventorysort.AnotherInventorySortClient"],
+    "modmenu": ["dev.whisperlyric.anotherinventorysort.compat.ModMenuImpl"]
   },
   "accessWidener": "anotherinventorysort.accesswidener",
   "mixins": [
@@ -23,6 +24,7 @@
     "fabricloader": ">=${loader_version}",
     "minecraft": "${minecraft_range}",
     "java": ">=${java_version}",
-    "fabric-api": "*"
+    "fabric-api": "*",
+    "malilib": ">=0.28.0"
   }
 }
