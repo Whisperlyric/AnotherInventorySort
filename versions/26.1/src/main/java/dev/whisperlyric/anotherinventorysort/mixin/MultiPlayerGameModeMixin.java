@@ -36,6 +36,9 @@ public class MultiPlayerGameModeMixin {
         // Allow the mod's own internal operations (e.g., auto-pickup protection)
         if (LockSlotManager.isProcessingLockedPickups()) return;
 
+        // Skip lock protection in creative mode
+        if (player.isCreative()) return;
+
         if (slotNum < 0) return; // -999 = outside click, -1 = no slot
 
         Minecraft client = Minecraft.getInstance();
@@ -48,9 +51,11 @@ public class MultiPlayerGameModeMixin {
         if (slotNum >= menu.slots.size()) return;
 
         // PICKUP_ALL special handling: even double-clicking a non-locked slot makes the
-        // server collect same-type items from locked slots.
+        // server collect same-type items from locked slots. Skip in creative mode.
         if (containerInput == ContainerInput.PICKUP_ALL) {
-            handlePickupAll(menu, client, ci);
+            if (!player.isCreative()) {
+                handlePickupAll(menu, client, ci);
+            }
             return;
         }
 
