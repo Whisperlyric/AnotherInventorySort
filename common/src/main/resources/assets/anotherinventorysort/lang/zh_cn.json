@@ -4,5 +4,6 @@
   "anotherinventorysort.button.sort_column": "按列整理",
   "anotherinventorysort.button.sort_row": "按行整理",
   "key.anotherinventorysort.sort_at_cursor": "整理光标所在区域",
-  "key.anotherinventorysort.lock_modifier": "锁定附加键"
+  "key.anotherinventorysort.lock_modifier": "锁定附加键",
+  "key.anotherinventorysort.transfer_all": "按钮状态切换附加键"
 }
