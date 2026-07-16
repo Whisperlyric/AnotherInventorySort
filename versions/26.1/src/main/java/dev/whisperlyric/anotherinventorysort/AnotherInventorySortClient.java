@@ -24,7 +24,6 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.*;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.client.renderer.RenderPipelines;
 import org.lwjgl.glfw.GLFW;
 
@@ -380,8 +379,6 @@ public class AnotherInventorySortClient implements ClientModInitializer {
         if (menu.slots.isEmpty()) return null;
 
         ItemStack stack0 = menu.getSlot(0).getItem();
-        if (!stack0.is(Items.STRUCTURE_VOID)) return null;
-
         var cd = stack0.get(DataComponents.CUSTOM_DATA);
         if (cd == null) return null;
 
@@ -426,23 +423,6 @@ public class AnotherInventorySortClient implements ClientModInitializer {
                     new int[]{guiTop + 17, guiLeft + 176 - 7};
             default -> findPlayerStorageArea(menu, guiLeft, guiTop);
         };
-    }
-
-    private static int[] findContainerSlotArea(AbstractContainerMenu menu, int guiLeft, int guiTop) {
-        int topY = -1;
-        int rightX = -1;
-
-        for (int i = 0; i < menu.slots.size(); i++) {
-            Slot slot = menu.getSlot(i);
-            if (!(slot.container instanceof Inventory)) {
-                int slotY = guiTop + slot.y;
-                int slotRightX = guiLeft + slot.x + 18;
-                if (topY == -1 || slotY < topY) topY = slotY;
-                if (slotRightX > rightX) rightX = slotRightX;
-            }
-        }
-
-        return fallbackIfNeeded(topY, rightX, guiLeft, guiTop);
     }
 
     private static int[] findPlayerStorageArea(AbstractContainerMenu menu, int guiLeft, int guiTop) {
