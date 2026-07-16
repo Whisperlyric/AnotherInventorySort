@@ -32,8 +32,8 @@ import java.util.*;
 
 public class AnotherInventorySortClient implements ClientModInitializer {
 
-    private static final int BUTTON_SIZE = 10;
-    private static final int BUTTON_SPACING = 12;
+    private static final int BUTTON_SIZE = 11;
+    private static final int BUTTON_SPACING = 13;
     private static final int BUTTON_GAP = 2;
     private static final Identifier BUTTON_TEXTURE = Identifier.fromNamespaceAndPath(
             "anotherinventorysort", "textures/gui/buttons.png");
@@ -406,9 +406,9 @@ public class AnotherInventorySortClient implements ClientModInitializer {
         int[] pos = computeButtonArea(menu, category, guiLeft, guiTop);
         int startX = pos[1] - BUTTON_SPACING * 3;
         int startY = pos[0] - BUTTON_SPACING;
-        sortButtons.add(new SortButtonInfo(startX, startY, 10, SortMode.DEFAULT));
-        sortButtons.add(new SortButtonInfo(startX + BUTTON_SPACING, startY, 20, SortMode.ROW));
-        sortButtons.add(new SortButtonInfo(startX + BUTTON_SPACING * 2, startY, 30, SortMode.COLUMN));
+        sortButtons.add(new SortButtonInfo(startX, startY, 11, SortMode.DEFAULT));
+        sortButtons.add(new SortButtonInfo(startX + BUTTON_SPACING, startY, 22, SortMode.ROW));
+        sortButtons.add(new SortButtonInfo(startX + BUTTON_SPACING * 2, startY, 33, SortMode.COLUMN));
 
         // Transfer buttons
         if (category == ContainerCategory.SORTABLE_STORAGE) {
@@ -486,7 +486,7 @@ public class AnotherInventorySortClient implements ClientModInitializer {
             buttonY = guiTop + 84;
         }
 
-        return new int[]{buttonY + 4, guiLeft + 176 - 7};
+        return new int[]{buttonY + 3, guiLeft + 176 - 7};
     }
 
     private static class SortButtonInfo {
@@ -527,7 +527,7 @@ public class AnotherInventorySortClient implements ClientModInitializer {
         for (SortButtonInfo btn : sortButtons) {
             boolean hovered = btn.isHovered(mouseX, mouseY);
             float u = btn.textureX;
-            float v = hovered ? 10 : 0;
+            float v = hovered ? 11 : 0;
             graphics.blit(RenderPipelines.GUI_TEXTURED, BUTTON_TEXTURE, btn.x, btn.y, u, v,
                     BUTTON_SIZE, BUTTON_SIZE, 128, 128);
         }
@@ -538,8 +538,8 @@ public class AnotherInventorySortClient implements ClientModInitializer {
             boolean hovered = btn.isHovered(mouseX, mouseY);
             boolean transferAll = isShiftHeld();
 
-            float u = btn.playerToContainer ? 50 : 40;
-            float v = (transferAll ? 20 : 0) + (hovered ? 10 : 0);
+            float u = btn.playerToContainer ? 55 : 44;
+            float v = (transferAll ? 22 : 0) + (hovered ? 11 : 0);
 
             graphics.blit(RenderPipelines.GUI_TEXTURED, BUTTON_TEXTURE, btn.x, btn.y, u, v,
                     BUTTON_SIZE, BUTTON_SIZE, 128, 128);
