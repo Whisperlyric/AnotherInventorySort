@@ -41,11 +41,11 @@ public class LockSlotManager {
 
     /**
      * Check if an inventory slot index is lockable.
-     * Lockable slots: hotbar (0-8), main inventory (9-35), offhand (40).
-     * Not lockable: armor (36-39), crafting result (-1), etc.
+     * Lockable slots: hotbar (0-8), main inventory (9-35), armor (36-39), offhand (40).
+     * Not lockable: crafting result (-1), etc.
      */
     public static boolean isLockableSlot(int invSlot) {
-        return (invSlot >= 0 && invSlot <= 35) || invSlot == 40;
+        return (invSlot >= 0 && invSlot <= 39) || invSlot == 40;
     }
 
     public static boolean isSlotLocked(int invSlot) {

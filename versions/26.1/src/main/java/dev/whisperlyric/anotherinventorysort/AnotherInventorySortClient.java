@@ -16,7 +16,7 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
+// import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -116,8 +116,7 @@ public class AnotherInventorySortClient implements ClientModInitializer {
 
         ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
             if (!(screen instanceof AbstractContainerScreen<?> containerScreen)) return;
-            if (screen instanceof CreativeModeInventoryScreen) return;
-
+            // if (screen instanceof CreativeModeInventoryScreen) return;
             AbstractContainerMenu menu = containerScreen.getMenu();
             if (isNonStorage(menu)) return;
 
@@ -485,13 +484,6 @@ public class AnotherInventorySortClient implements ClientModInitializer {
         }
 
         return new int[]{buttonY + 4, guiLeft + 176 - 7};
-    }
-
-    private static int[] fallbackIfNeeded(int topY, int rightX, int guiLeft, int guiTop) {
-        if (topY == -1) {
-            return new int[]{guiTop + 5, guiLeft + 176 - 7};
-        }
-        return new int[]{topY, rightX};
     }
 
     private static class SortButtonInfo {
