@@ -15,6 +15,15 @@ base.archivesName.set(rootProject.property("mod_id") as String)
 repositories {
     mavenCentral()
     maven("https://maven.fabricmc.net/")
+    maven("https://maven.terraformersmc.com/")
+    exclusiveContent {
+        forRepository {
+            maven("https://cursemaven.com")
+        }
+        filter {
+            includeGroup("curse.maven")
+        }
+    }
 }
 
 dependencies {
@@ -22,6 +31,8 @@ dependencies {
     "minecraft"("com.mojang:minecraft:$minecraft_version")
     implementation("net.fabricmc:fabric-loader:$fabric_loader_version")
     implementation("net.fabricmc.fabric-api:fabric-api:$fabric_api_version")
+    implementation("curse.maven:malilib-303119:8334184") // malilib-fabric-26.1.2-0.28.8
+    implementation("com.terraformersmc:modmenu:20.0.1") // ModMenu for 26.x
 }
 
 sourceSets {

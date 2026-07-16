@@ -4,15 +4,16 @@ import dev.whisperlyric.anotherinventorysort.sort.SortHandler;
 import dev.whisperlyric.anotherinventorysort.sort.SortMode;
 import dev.whisperlyric.anotherinventorysort.transfer.TransferHandler;
 import dev.whisperlyric.anotherinventorysort.transfer.TransferMode;
+import fi.dy.masa.malilib.config.ConfigManager;
+import fi.dy.masa.malilib.event.InputEventHandler;
+import fi.dy.masa.malilib.registry.Registry;
+import fi.dy.masa.malilib.util.data.ModInfo;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents;
 import net.fabricmc.loader.api.FabricLoader;
-import com.mojang.blaze3d.platform.InputConstants;
-import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -43,43 +44,27 @@ public class AnotherInventorySortClient implements ClientModInitializer {
     private static int lockDragAction = -1; // 0 = lock, 1 = unlock
 
     // Auto-pickup protection: track previous item state of locked slots
-    // Key = inventory slot index, Value = snapshot of the item in that slot
     private static final Map<Integer, ItemStack> previousLockedSlotState = new HashMap<>();
     private static boolean wasScreenOpen = false;
-
-    private static KeyMapping sortAtCursorKey;
-    private static KeyMapping lockModifierKey;
-    private static KeyMapping transferModifierKey;
 
     @Override
     public void onInitializeClient() {
         Path configDir = FabricLoader.getInstance().getConfigDir().resolve("anotherinventorysort");
         LockSlotManager.init(configDir);
 
-        // Register custom key mapping category
-        KeyMapping.Category MAIN_CATEGORY = KeyMapping.Category.register(
-                Identifier.fromNamespaceAndPath("anotherinventorysort", "main"));
+        // Load malilib configs
+        ConfigManager.getInstance().registerConfigHandler("anotherinventorysort", new AnotherInventorySortConfigs());
 
-        sortAtCursorKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
-                "key.anotherinventorysort.sort_at_cursor",
-                InputConstants.Type.MOUSE,
-                GLFW.GLFW_MOUSE_BUTTON_MIDDLE,
-                MAIN_CATEGORY
-        ));
+        // Register config screen
+        Registry.CONFIG_SCREEN.registerConfigScreenFactory(
+                new ModInfo("anotherinventorysort", "Another Inventory Sort", GuiConfig::new)
+        );
 
-        lockModifierKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
-                "key.anotherinventorysort.lock_modifier",
-                InputConstants.Type.KEYSYM,
-                GLFW.GLFW_KEY_LEFT_ALT,
-                MAIN_CATEGORY
-        ));
-
-        transferModifierKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
-                "key.anotherinventorysort.transfer_all",
-                InputConstants.Type.KEYSYM,
-                GLFW.GLFW_KEY_LEFT_SHIFT,
-                MAIN_CATEGORY
-        ));
+        // Register malilib input handlers
+        InputHandler inputHandler = InputHandler.getInstance();
+        InputEventHandler.getKeybindManager().registerKeybindProvider(inputHandler);
+        InputEventHandler.getInputManager().registerKeyboardInputHandler(inputHandler);
+        InputEventHandler.getInputManager().registerMouseInputHandler(inputHandler);
 
         // Track server changes for per-server lock persistence
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
@@ -290,35 +275,16 @@ public class AnotherInventorySortClient implements ClientModInitializer {
     }
 
     private static boolean isAltHeld() {
-        if (lockModifierKey == null) return false;
-        InputConstants.Key boundKey = KeyMappingHelper.getBoundKeyOf(lockModifierKey);
-        if (boundKey == null) return false;
-        var window = Minecraft.getInstance().getWindow();
-        if (boundKey.getType() == InputConstants.Type.KEYSYM) {
-            return InputConstants.isKeyDown(window, boundKey.getValue());
-        } else if (boundKey.getType() == InputConstants.Type.MOUSE) {
-            return GLFW.glfwGetMouseButton(window.handle(), boundKey.getValue()) == GLFW.GLFW_PRESS;
-        }
-        return false;
+        return AnotherInventorySortConfigs.LOCK_MODIFIER.getKeybind().isKeybindHeld();
     }
 
     private static boolean isShiftHeld() {
-        if (transferModifierKey == null) return false;
-        InputConstants.Key boundKey = KeyMappingHelper.getBoundKeyOf(transferModifierKey);
-        if (boundKey == null) return false;
-        var window = Minecraft.getInstance().getWindow();
-        if (boundKey.getType() == InputConstants.Type.KEYSYM) {
-            return InputConstants.isKeyDown(window, boundKey.getValue());
-        } else if (boundKey.getType() == InputConstants.Type.MOUSE) {
-            return GLFW.glfwGetMouseButton(window.handle(), boundKey.getValue()) == GLFW.GLFW_PRESS;
-        }
-        return false;
+        return AnotherInventorySortConfigs.TRANSFER_ALL_MODIFIER.getKeybind().isKeybindHeld();
     }
 
     private static boolean isSortAtCursorButton(int button) {
-        if (sortAtCursorKey == null) return false;
-        InputConstants.Key boundKey = KeyMappingHelper.getBoundKeyOf(sortAtCursorKey);
-        return boundKey.getType() == InputConstants.Type.MOUSE && boundKey.getValue() == button;
+        var keybind = AnotherInventorySortConfigs.SORT_AT_CURSOR.getKeybind();
+        return keybind.isKeybindHeld();
     }
 
     private static Slot findSlotAt(AbstractContainerMenu menu, double mouseX, double mouseY,
