@@ -97,6 +97,9 @@ public class AnotherInventorySortClient implements ClientModInitializer {
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (client.player == null) return;
+            // Skip during shutdown to avoid sending network packets that may contribute
+            // to IntegratedServer.halt() timeout (especially with Ixeris threaded event polling)
+            if (client.isSameThread() && client.level == null) return;
 
             // Auto-pickup protection: check both when screen is open and closed.
             // When open: detect items entering locked slots via PICKUP_ALL/ItemScroller.
@@ -567,7 +570,7 @@ public class AnotherInventorySortClient implements ClientModInitializer {
     }
 
     private static void checkLockedSlotsForPickups(Minecraft client) {
-        if (client.player == null) return;
+        if (client.player == null || client.gameMode == null || client.level == null) return;
         Inventory inv = client.player.getInventory();
         var menu = client.player.containerMenu;
 
