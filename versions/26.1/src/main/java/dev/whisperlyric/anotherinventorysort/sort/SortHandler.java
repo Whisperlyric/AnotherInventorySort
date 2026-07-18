@@ -38,7 +38,7 @@ public class SortHandler {
     }
 
     public static void sortInventory(AbstractContainerScreen<?> screen, SortMode mode,
-                                      String category, boolean ignoreLocks) {
+                                     String category, boolean ignoreLocks) {
         Minecraft client = Minecraft.getInstance();
         if (client.player == null || client.gameMode == null) return;
 
@@ -69,16 +69,14 @@ public class SortHandler {
         int totalSlots = sortableSlots.size();
         int rows = (totalSlots + columns - 1) / columns;
 
-        // Step 1: Collect non-locked items → merge via HashMap + record stack-count distribution per type
+        // Step 1: Collect non-locked items → merge via HashMap
         Map<ItemTypeKey, Integer> bucket = new HashMap<>();
-        Map<ItemTypeKey, List<Integer>> typeStackCounts = new HashMap<>();
         for (int i = 0; i < activeSlots.size(); i++) {
             if (lockedIndices.contains(i)) continue;
             ItemStack stack = menu.getSlot(activeSlots.get(i)).getItem();
             if (!stack.isEmpty()) {
                 ItemTypeKey key = new ItemTypeKey(stack);
                 bucket.merge(key, stack.getCount(), Integer::sum);
-                typeStackCounts.computeIfAbsent(key, k -> new ArrayList<>()).add(stack.getCount());
             }
         }
         if (bucket.isEmpty()) return;
@@ -117,24 +115,18 @@ public class SortHandler {
             }
         }
 
-        // Build goal per group independently: when current stack count == pack stack count,
-        // keep the current count distribution (avoids infinite loops).
+        // Build goal per group: always use pack distribution (full stacks first, remainder last).
+        // This ensures same-type items are properly consolidated before ordering.
         for (int g = 0; g < groupTypes.size(); g++) {
             List<Integer> slots = targetSlots.get(g);
             ItemTypeKey type = groupTypes.get(g);
             List<Integer> packCounts = SortUtils.pack(bucket.get(type),
                     type.sampleStack.getMaxStackSize());
-            List<Integer> currentCounts = typeStackCounts.get(type);
 
-            // Decide the goal stack-count distribution
-            List<Integer> goalCounts;
-            if (currentCounts != null && currentCounts.size() == packCounts.size()) {
-                // current is already at the minimum stack count: keep original distribution (pure swap, avoids loops)
-                goalCounts = currentCounts;
-            } else {
-                // current stack count > pack stack count: merge needed, use pack result
-                goalCounts = packCounts;
-            }
+            // Always use pack distribution: full stacks first, remainder last.
+            // This ensures same-type items are properly consolidated before ordering.
+            // (e.g., [64,23,64,64] → goal [64,64,64,23] instead of keeping [64,23,64,64])
+            List<Integer> goalCounts = packCounts;
 
             for (int s = 0; s < slots.size() && s < goalCounts.size(); s++) {
                 int slotIdx = slots.get(s);
@@ -159,8 +151,8 @@ public class SortHandler {
      * Sandbox preview: currentStacks[] tracks state in memory.
      */
     private static void executeWithCursor(Minecraft client, AbstractContainerMenu menu,
-                                           List<Integer> activeSlots, ItemStack[] goalStacks,
-                                           Set<Integer> lockedIndices) {
+                                          List<Integer> activeSlots, ItemStack[] goalStacks,
+                                          Set<Integer> lockedIndices) {
         int containerId = menu.containerId;
         int n = activeSlots.size();
 
@@ -229,6 +221,31 @@ public class SortHandler {
                 }
             }
         }
+
+        // Safety cleanup: if cursor still has items after the loop, try to place them back.
+        // This prevents items being left on the cursor when the executor exits early
+        // (e.g., loop guard triggered or unresolvable state).
+        if (!cursor.isEmpty()) {
+            for (int i = 0; i < n; i++) {
+                if (lockedIndices.contains(i)) continue;
+                ItemStack slotItem = current[i];
+                if (slotItem.isEmpty()) {
+                    if (client.player != null) {
+                        client.gameMode.handleContainerInput(containerId,
+                                activeSlots.get(i), 0, ContainerInput.PICKUP, client.player);
+                    }
+                    break;
+                }
+                if (ItemStack.isSameItemSameComponents(cursor, slotItem)
+                        && slotItem.getCount() < slotItem.getMaxStackSize()) {
+                    if (client.player != null) {
+                        client.gameMode.handleContainerInput(containerId,
+                                activeSlots.get(i), 0, ContainerInput.PICKUP, client.player);
+                    }
+                    break;
+                }
+            }
+        }
     }
 
     /**
@@ -278,13 +295,15 @@ public class SortHandler {
      * Priority (avoids infinite loops: prefer exact count match first):
      * 1. Goal same type + current empty + goal.count == cursor.count → perfect place
      * 2. Goal same type + current same type not full + merged == goal.count → merge to correct count
-     * 3. Goal same type + current empty + goal.count != cursor.count → place (cursor has remainder or deficit)
-     * 4. Goal same type + current same type not full + merged <= goal.count → merge (deficit)
-     * 5. Goal same type + current different type → swap
+     * 3. Goal same type + goal.count == cursor.count + current same type wrong count → count-correct swap/merge
+     * 4. Goal same type + current empty + goal.count != cursor.count → place (cursor has remainder or deficit)
+     * 5. Goal same type + current same type not full + merged <= goal.count → merge (deficit)
+     * 6. Goal same type + current different type → swap
      */
     private static int findTargetSlot(ItemStack cursor, ItemStack[] current, ItemStack[] goal,
-                                       Set<Integer> locked) {
+                                      Set<Integer> locked) {
         int cursorCount = cursor.getCount();
+        // Priority 1: perfect place in empty slot
         for (int i = 0; i < goal.length; i++) {
             if (locked.contains(i)) continue;
             if (!goal[i].isEmpty()
@@ -292,6 +311,7 @@ public class SortHandler {
                     && current[i].isEmpty()
                     && goal[i].getCount() == cursorCount) return i;
         }
+        // Priority 2: merge to exact goal count
         for (int i = 0; i < goal.length; i++) {
             if (locked.contains(i)) continue;
             if (!goal[i].isEmpty()
@@ -301,12 +321,41 @@ public class SortHandler {
                     && current[i].getCount() < current[i].getMaxStackSize()
                     && current[i].getCount() + cursorCount == goal[i].getCount()) return i;
         }
+        // Priority 3: same-type count-correct placement
+        // When goal.count == cursor.count and current slot has same type but wrong count,
+        // check if clicking this slot would result in the correct goal count.
+        // This handles same-type count rearrangement (e.g., cursor=64A, slot=23A, goal=64A
+        // → partial merge fills slot to 64; or cursor=23A, slot=64A, goal=23A → swap).
+        for (int i = 0; i < goal.length; i++) {
+            if (locked.contains(i)) continue;
+            if (!goal[i].isEmpty()
+                    && ItemStack.isSameItemSameComponents(cursor, goal[i])
+                    && goal[i].getCount() == cursorCount
+                    && !current[i].isEmpty()
+                    && ItemStack.isSameItemSameComponents(cursor, current[i])
+                    && current[i].getCount() != goal[i].getCount()) {
+                // Verify the click result would produce goal.count in this slot
+                int dstCount = current[i].getCount();
+                int max = current[i].getMaxStackSize();
+                int resultCount;
+                if (dstCount >= max) {
+                    resultCount = cursorCount; // swap (slot was full)
+                } else if (dstCount + cursorCount <= max) {
+                    resultCount = dstCount + cursorCount; // full merge
+                } else {
+                    resultCount = max; // partial merge: slot fills to max
+                }
+                if (resultCount == goal[i].getCount()) return i;
+            }
+        }
+        // Priority 4: place in empty slot (cursor has remainder or deficit)
         for (int i = 0; i < goal.length; i++) {
             if (locked.contains(i)) continue;
             if (!goal[i].isEmpty()
                     && ItemStack.isSameItemSameComponents(cursor, goal[i])
                     && current[i].isEmpty()) return i;
         }
+        // Priority 5: merge with deficit
         for (int i = 0; i < goal.length; i++) {
             if (locked.contains(i)) continue;
             if (!goal[i].isEmpty()
@@ -316,6 +365,7 @@ public class SortHandler {
                     && current[i].getCount() < current[i].getMaxStackSize()
                     && current[i].getCount() + cursorCount <= goal[i].getCount()) return i;
         }
+        // Priority 6: swap with different-type slot
         for (int i = 0; i < goal.length; i++) {
             if (locked.contains(i)) continue;
             if (!goal[i].isEmpty()
@@ -343,7 +393,7 @@ public class SortHandler {
      * After swap, cursor becomes current[i]; the old cursor item is temporarily placed at slot i.
      */
     private static int findSwapSlot(ItemStack cursor, ItemStack[] current, ItemStack[] goal,
-                                     Set<Integer> locked) {
+                                    Set<Integer> locked) {
         for (int i = 0; i < current.length; i++) {
             if (locked.contains(i)) continue;
             if (current[i].isEmpty()) continue;
@@ -403,7 +453,7 @@ public class SortHandler {
     }
 
     private static List<Integer> getSortableSlots(AbstractContainerMenu menu, boolean isPlayerInventory,
-                                                   String category) {
+                                                  String category) {
         List<Integer> slots = new ArrayList<>();
 
         if ("GCA_FAKE_PLAYER_INVENTORY".equals(category)) {
