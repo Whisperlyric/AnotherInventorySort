@@ -32,7 +32,7 @@ dependencies {
     implementation("net.fabricmc:fabric-loader:$fabric_loader_version")
     implementation("net.fabricmc.fabric-api:fabric-api:$fabric_api_version")
     implementation("curse.maven:malilib-303119:8334184") // malilib-fabric-26.1.2-0.28.8
-    implementation("com.terraformersmc:modmenu:20.0.1") // ModMenu for 26.x
+    implementation("com.terraformersmc:modmenu:18.0.0") // ModMenu for 26.x
 }
 
 sourceSets {

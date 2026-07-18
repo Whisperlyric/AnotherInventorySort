@@ -1,9 +1,25 @@
 {
-  "key.category.anotherinventorysort.main": "Another Inventory Sort",
+  "anotherinventorysort.hotkeys.category": "Another Inventory Sort",
+  "anotherinventorysort.gui.title.configs": "Another Inventory Sort 配置",
+
+  "anotherinventorysort.config.hotkeys.name.sortAtCursor": "整理光标所在区域",
+  "anotherinventorysort.config.hotkeys.comment.sortAtCursor": "整理光标所在位置的物品栏",
+  "anotherinventorysort.config.hotkeys.name.lockModifier": "锁定附加键",
+  "anotherinventorysort.config.hotkeys.comment.lockModifier": "锁定/解锁槽位的修饰键",
+  "anotherinventorysort.config.hotkeys.name.transferAllModifier": "全部转移附加键",
+  "anotherinventorysort.config.hotkeys.comment.transferAllModifier": "按住此键点击转移按钮进行全部转移",
+  "anotherinventorysort.config.hotkeys.name.openConfig": "打开配置",
+  "anotherinventorysort.config.hotkeys.comment.openConfig": "打开配置界面",
+
+  "anotherinventorysort.config.generic.name.sortEnabled": "启用整理",
+  "anotherinventorysort.config.generic.comment.sortEnabled": "启用物品栏自动整理",
+  "anotherinventorysort.config.generic.name.slotLockEnabled": "启用槽位锁定",
+  "anotherinventorysort.config.generic.comment.slotLockEnabled": "启用槽位锁定功能",
+  "anotherinventorysort.config.generic.name.transferButtonsEnabled": "启用转移按钮",
+  "anotherinventorysort.config.generic.comment.transferButtonsEnabled": "在容器和玩家物品栏之间显示转移按钮",
+  "anotherinventorysort.config.generic.name.blockExternalSwaps": "阻止外部交换",
+
   "anotherinventorysort.button.sort": "整理",
   "anotherinventorysort.button.sort_column": "按列整理",
-  "anotherinventorysort.button.sort_row": "按行整理",
-  "key.anotherinventorysort.sort_at_cursor": "整理光标所在区域",
-  "key.anotherinventorysort.lock_modifier": "锁定附加键",
-  "key.anotherinventorysort.transfer_all": "按钮状态切换附加键"
+  "anotherinventorysort.button.sort_row": "按行整理"
 }

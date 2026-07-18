@@ -1,9 +1,25 @@
 {
-  "key.category.anotherinventorysort.main": "Another Inventory Sort",
+  "anotherinventorysort.hotkeys.category": "Another Inventory Sort",
+  "anotherinventorysort.gui.title.configs": "Another Inventory Sort Configs",
+
+  "anotherinventorysort.config.hotkeys.name.sortAtCursor": "Sort at Cursor",
+  "anotherinventorysort.config.hotkeys.comment.sortAtCursor": "Sort inventory at cursor position",
+  "anotherinventorysort.config.hotkeys.name.lockModifier": "Lock Modifier",
+  "anotherinventorysort.config.hotkeys.comment.lockModifier": "Modifier key to lock/unlock slots",
+  "anotherinventorysort.config.hotkeys.name.transferAllModifier": "Transfer All Modifier",
+  "anotherinventorysort.config.hotkeys.comment.transferAllModifier": "Modifier key for full transfer",
+  "anotherinventorysort.config.hotkeys.name.openConfig": "Open Config",
+  "anotherinventorysort.config.hotkeys.comment.openConfig": "Open configuration screen",
+
+  "anotherinventorysort.config.generic.name.sortEnabled": "Sort Enabled",
+  "anotherinventorysort.config.generic.comment.sortEnabled": "Enable inventory sorting",
+  "anotherinventorysort.config.generic.name.slotLockEnabled": "Slot Lock Enabled",
+  "anotherinventorysort.config.generic.comment.slotLockEnabled": "Enable slot locking feature",
+  "anotherinventorysort.config.generic.name.transferButtonsEnabled": "Transfer Buttons Enabled",
+  "anotherinventorysort.config.generic.comment.transferButtonsEnabled": "Show transfer buttons between container and player inventory",
+  "anotherinventorysort.config.generic.name.blockExternalSwaps": "Block External Swaps",
+
   "anotherinventorysort.button.sort": "Sort",
   "anotherinventorysort.button.sort_column": "Sort by Column",
-  "anotherinventorysort.button.sort_row": "Sort by Row",
-  "key.anotherinventorysort.sort_at_cursor": "Sort at Cursor",
-  "key.anotherinventorysort.lock_modifier": "Lock Modifier",
-  "key.anotherinventorysort.transfer_all": "Button State Modifier Key"
+  "anotherinventorysort.button.sort_row": "Sort by Row"
 }
